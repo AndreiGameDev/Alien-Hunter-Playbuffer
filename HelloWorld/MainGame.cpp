@@ -4,7 +4,7 @@
 
 int DISPLAY_WIDTH = 640;
 int DISPLAY_HEIGHT = 360;
-int DISPLAY_SCALE = 2;
+int DISPLAY_SCALE = 3;
 
 // The entry point for a PlayBuffer program
 void MainGameEntry( PLAY_IGNORE_COMMAND_LINE )
@@ -15,8 +15,8 @@ void MainGameEntry( PLAY_IGNORE_COMMAND_LINE )
 // Called by PlayBuffer every frame (60 times a second!)
 bool MainGameUpdate( float elapsedTime )
 {
-	Play::ClearDrawingBuffer( Play::cOrange );
-	Play::DrawDebugText( { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, "Hello World!" );
+	Play::ClearDrawingBuffer( Play::cBlack );
+	Play::DrawDebugText( { DISPLAY_WIDTH / 2, 10 }, "Hello World!" );
 	Play::PresentDrawingBuffer();
 	return Play::KeyDown( VK_ESCAPE );
 }
