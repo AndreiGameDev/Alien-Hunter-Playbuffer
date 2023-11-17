@@ -1472,6 +1472,7 @@ PlayWindow* PlayWindow::s_pInstance = nullptr;
 // External functions which must be implemented by the user 
 extern void MainGameEntry( int argc, char* argv[] ); 
 extern bool MainGameUpdate( float ); // Called every frame
+void PlayFunctions();
 extern int MainGameExit( void ); // Called on quit
 
 ULONG_PTR g_pGDIToken = 0;
