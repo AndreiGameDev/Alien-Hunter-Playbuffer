@@ -75,7 +75,6 @@ void UpdatePlayer() {
 		Play::GetGameObject(idLeftProjectile).velocity.y = -projectileSpeed;
 		Play::GetGameObject(idRightProjectile).velocity.y = -projectileSpeed;
 		canShoot = false;
-		Timer().
 	}
 	// Update position of the player
 	Play::UpdateGameObject(player);
