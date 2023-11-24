@@ -36,12 +36,17 @@ void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
 {
 	Play::CreateManager(_displayWidth, _displayHeight, _displayScale);
 	Play::CreateGameObject(TYPE_Player, { _displayWidth / 2, _displayHeight - 10 }, 16, "Player_Spaceship_Idle"); // Player sprite
-	//	Play::CreateGameObject(2, { 16, 16 }, 2.5, "testSprite"); // Player laser 
-	//	Play::CreateGameObject(3, { 16,16 }, 5, "testSprite"); // Enemy sprite
 	Play::CentreAllSpriteOrigins();
 }
+
+
+void UpdateScore() {
+	Play::DrawDebugText({ 5, 14 }, std::string("Score:" + std::to_string(score)).c_str(), Play::cWhite, false);
+}
+
 void UpdatePlayer() {
 	GameObject& player = Play::GetGameObjectByType(TYPE_Player);
+	bool canShoot = true;
 	player.pos += player.velocity;
 	if (Play::IsLeavingDisplayArea(player, Play::HORIZONTAL)) {
 		player.pos.x = player.oldPos.x;
@@ -62,13 +67,15 @@ void UpdatePlayer() {
 		player.velocity.x = 0;
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "Idle");
 	}
-	if (Play::KeyPressed(0x01)) { // Mouse 1
+	if (Play::KeyPressed(0x01) && canShoot) { // Mouse 1
 		Vector2D RightPos = Vector2D(player.pos.x + 6, player.pos.y - 6);
 		Vector2D LeftPos = Vector2D(player.pos.x - 6, player.pos.y - 6);
 		int idLeftProjectile = Play::CreateGameObject(Type_PlayerProjectile, RightPos, 2, "PlayerLaser");
 		int idRightProjectile = Play::CreateGameObject(Type_PlayerProjectile, LeftPos, 2, "PlayerLaser");
 		Play::GetGameObject(idLeftProjectile).velocity.y = -projectileSpeed;
 		Play::GetGameObject(idRightProjectile).velocity.y = -projectileSpeed;
+		canShoot = false;
+		Timer().
 	}
 	// Update position of the player
 	Play::UpdateGameObject(player);
@@ -80,17 +87,14 @@ void UpdatePlayer() {
 
 void EnemySpawner() {
 	if (Play::KeyPressed(VK_SPACE)) {
-		int idEnemy = Play::CreateGameObject(Type_Enemy, { _displayWidth, _displayHeight - 30 }, 1, "Enemy1");
+		int idEnemy = Play::CreateGameObject(Type_Enemy, { _displayWidth, 20 }, 16, "Enemy1");
 		Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
 	}
-	
 }
 
 void UpdateEnemies() {
 	std::vector<int> vEnemies = Play::CollectGameObjectIDsByType(Type_Enemy);
 	for (int _idEnemy : vEnemies) {
-		bool isHittingEdgeLeft = false;
-		bool isHittingEdgeRight = false;
 		GameObject& obj_enemy = Play::GetGameObject(_idEnemy);
 		if (Play::IsLeavingDisplayArea(obj_enemy, Play::HORIZONTAL)) {
 			obj_enemy.pos.x = obj_enemy.pos.x;
@@ -110,41 +114,54 @@ void UpdateEnemies() {
 void UpdateProjectiles()
 {
 	std::vector<int> vPlayerProjectiles = Play::CollectGameObjectIDsByType(Type_PlayerProjectile);
+	std::vector<int> vEnemies = Play::CollectGameObjectIDsByType(Type_Enemy);
 	for (int id_laser : vPlayerProjectiles) {
 		GameObject& obj_laser = Play::GetGameObject(id_laser);
 		bool hasCollided = false;
+		
+		if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Type_Enemy))) {
+			hasCollided = true;
+		}
+
+		for (int id_enemy : vEnemies) {
+			GameObject& obj_enemy = Play::GetGameObject(id_enemy);
+			if (Play::IsColliding(obj_laser, obj_enemy)) {
+				if (obj_enemy.type != Type_Destroyed) {
+					hasCollided = true;
+					obj_enemy.type = Type_Destroyed;
+					//Play audio
+					score += 200;
+				}
+			}
+		}
+
 		Play::UpdateGameObject(obj_laser);
 		Play::DrawObject(obj_laser);
+		
 
-		if (!Play::IsVisible(obj_laser) || hasCollided) {
+		if (!Play::IsVisible || hasCollided) {
 			Play::DestroyGameObject(id_laser);
 		}
 	}
 }
-//void UpdateDestroyed()
-//{
-//	std::vector<int> vDead = Play::CollectGameObjectIDsByType(Type_Destroyed);
-//	for (int id_dead : vDead)
-//	{
-//		GameObject& obj_dead = Play::GetGameObject(id_dead);
-//		obj_dead.animSpeed = 0.2f;
-//		Play::UpdateGameObject(obj_dead);
-//		if (obj_dead.frame % 2)
-//			Play::DrawObjectRotated(obj_dead, (10 - obj_dead.frame) / 10.0f);
-//		if (!Play::IsVisible(obj_dead) || obj_dead.frame >= 10)
-//			Play::DestroyGameObject(id_dead);
-//	}
-//}
-// Called by PlayBuffer every frame (60 times a second!)
+void UpdateDestroyed()
+{
+	std::vector<int> vDead = Play::CollectGameObjectIDsByType(Type_Destroyed);
+	for (int id_dead : vDead)
+	{
+		GameObject& obj_dead = Play::GetGameObject(id_dead);
+		if (!Play::IsVisible(obj_dead))
+			Play::DestroyGameObject(id_dead);
+	}
+}
 
 void MainMenu() {
-	Play::DrawFontText("64", "Press enter", { _displayWidth / 2, _displayHeight / 2 - 64 }, Play::CENTRE);
-	Play::DrawFontText("64", "to", { _displayWidth / 2, _displayHeight / 2 }, Play::CENTRE);
-	Play::DrawFontText("64", "Play", { _displayWidth / 2, _displayHeight / 2 + 64 }, Play::CENTRE);
+	Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "PRESS ENTER TO PLAY");
 	if (Play::KeyPressed(VK_RETURN)) {
 		currentPlayState = State_Play;
 	}
 }
+
 bool MainGameUpdate(float elapsedTime)
 {
 	Play::ClearDrawingBuffer(Play::cMagenta);
@@ -161,7 +178,7 @@ bool MainGameUpdate(float elapsedTime)
 		currentPlayState = State_MainMenu;
 		break;
 	}
-	
+
 	Play::PresentDrawingBuffer();
 	return Play::KeyDown(VK_ESCAPE);
 }
@@ -169,9 +186,11 @@ bool MainGameUpdate(float elapsedTime)
 void PlayFunctions()
 {
 	EnemySpawner();
+	UpdateDestroyed();
+	UpdateScore();
 	UpdatePlayer();
-	UpdateEnemies();
 	UpdateProjectiles();
+	UpdateEnemies();
 }
 
 // Gets called once when the player quits the game 
