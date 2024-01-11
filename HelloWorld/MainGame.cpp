@@ -2,7 +2,6 @@
 #define PLAY_USING_GAMEOBJECT_MANAGER
 #include "Play.h"
 
-
 enum GameObjectTypes {
 	TYPE_Null = -1,
 	TYPE_Player,
@@ -19,6 +18,13 @@ enum PlayState {
 
 PlayState currentPlayState;
 
+struct EnemyManager {
+	float spawnTimer = 0;
+	float spawnRate = .4f;
+	int enemiesSpawned = 0;
+	int enemiesToSpawn = 10;
+};
+EnemyManager enemyManager;
 
 int _displayWidth = 240;
 int _displayHeight = 240;
@@ -29,7 +35,7 @@ float playerSpeed = 1;
 float projectileSpeed = 2;
 float animatorSpeed = 0.1f;
 
-float enemySpeed = 1;
+float enemySpeed = 2;
 
 // The entry point for a PlayBuffer program
 void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
@@ -85,10 +91,25 @@ void UpdatePlayer() {
 }
 
 void EnemySpawner() {
-	if (Play::KeyPressed(VK_SPACE)) {
-		int idEnemy = Play::CreateGameObject(Type_Enemy, { _displayWidth, 20 }, 16, "Enemy1");
+	Vector2D rightSpawnPos = { _displayWidth, 20 };
+	
+	if (enemyManager.spawnTimer > enemyManager.spawnRate && enemyManager.enemiesToSpawn > 0) {
+		enemyManager.spawnTimer = 0;
+		enemyManager.enemiesToSpawn--;
+		enemyManager.enemiesSpawned++;
+		switch(Play::RandomRollRange(1, 3)) {
+			case 1:
+				break;
+			case 2:
+				break;
+			case 3:
+				break;
+
+		}
+		int idEnemy = Play::CreateGameObject(Type_Enemy, rightSpawnPos, 16, "Enemy1");
 		Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
 	}
+	
 }
 
 void UpdateEnemies() {
@@ -169,6 +190,7 @@ bool MainGameUpdate(float elapsedTime)
 		MainMenu();
 		break;
 	case State_Play:
+		enemyManager.spawnTimer += elapsedTime;
 		PlayFunctions();
 		break;
 	case State_Pause:
