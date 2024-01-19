@@ -6,8 +6,10 @@ enum GameObjectTypes {
 	TYPE_Null = -1,
 	TYPE_Player,
 	Type_PlayerProjectile,
-	Type_Enemy,
-	Type_Destroyed
+	Type_Destroyed,
+	Enemy_Speed,
+	Enemy_Heavy,
+	Enemy_Normal,
 };
 
 enum PlayState {
@@ -91,29 +93,43 @@ void UpdatePlayer() {
 }
 
 void EnemySpawner() {
-	Vector2D rightSpawnPos = { _displayWidth, 20 };
+	Vector2D rightSpawnPos = { _displayWidth, 40 };
 	
 	if (enemyManager.spawnTimer > enemyManager.spawnRate && enemyManager.enemiesToSpawn > 0) {
 		enemyManager.spawnTimer = 0;
 		enemyManager.enemiesToSpawn--;
 		enemyManager.enemiesSpawned++;
-		switch(Play::RandomRollRange(1, 3)) {
-			case 1:
-				break;
-			case 2:
-				break;
-			case 3:
-				break;
-
+		int randomEnemy = Play::RandomRollRange(1, 10);
+		if (randomEnemy < 6) {
+			int idEnemy = Play::CreateGameObject(Enemy_Normal, rightSpawnPos, 16, "Enemy1");
+			Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
 		}
-		int idEnemy = Play::CreateGameObject(Type_Enemy, rightSpawnPos, 16, "Enemy1");
-		Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
+		else if (randomEnemy > 6 && randomEnemy < 8) {
+			int idEnemy = Play::CreateGameObject(Enemy_Speed, rightSpawnPos, 16, "Enemy2");
+			Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
+		}
+		else {
+			int idEnemy = Play::CreateGameObject(Enemy_Heavy, rightSpawnPos, 16, "Enemy3");
+			Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
+		}
+		
 	}
 	
 }
 
 void UpdateEnemies() {
-	std::vector<int> vEnemies = Play::CollectGameObjectIDsByType(Type_Enemy);
+	std::vector<int> vEnemiesNormal = Play::CollectGameObjectIDsByType(Enemy_Normal);
+	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Speed);
+	std::vector<int> vEnemiesHeavy = Play::CollectGameObjectIDsByType(Enemy_Heavy);
+
+	std::vector<int> vEnemies;
+	vEnemies.reserve(vEnemiesNormal.size() + vEnemiesSpeed.size() + vEnemiesHeavy.size());
+
+	// Append the vectors using std::copy
+	std::copy(vEnemiesNormal.begin(), vEnemiesNormal.end(), std::back_inserter(vEnemies));
+	std::copy(vEnemiesSpeed.begin(), vEnemiesSpeed.end(), std::back_inserter(vEnemies));
+	std::copy(vEnemiesHeavy.begin(), vEnemiesHeavy.end(), std::back_inserter(vEnemies));
+
 	for (int _idEnemy : vEnemies) {
 		GameObject& obj_enemy = Play::GetGameObject(_idEnemy);
 		if (Play::IsLeavingDisplayArea(obj_enemy, Play::HORIZONTAL)) {
@@ -134,12 +150,30 @@ void UpdateEnemies() {
 void UpdateProjectiles()
 {
 	std::vector<int> vPlayerProjectiles = Play::CollectGameObjectIDsByType(Type_PlayerProjectile);
-	std::vector<int> vEnemies = Play::CollectGameObjectIDsByType(Type_Enemy);
+	std::vector<int> vEnemiesNormal = Play::CollectGameObjectIDsByType(Enemy_Normal);
+	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Speed);
+	std::vector<int> vEnemiesHeavy = Play::CollectGameObjectIDsByType(Enemy_Heavy);
+
+	std::vector<int> vEnemies;
+	vEnemies.reserve(vEnemiesNormal.size() + vEnemiesSpeed.size() + vEnemiesHeavy.size());
+
+	// Append the vectors using std::copy
+	std::copy(vEnemiesNormal.begin(), vEnemiesNormal.end(), std::back_inserter(vEnemies));
+	std::copy(vEnemiesSpeed.begin(), vEnemiesSpeed.end(), std::back_inserter(vEnemies));
+	std::copy(vEnemiesHeavy.begin(), vEnemiesHeavy.end(), std::back_inserter(vEnemies));
+
+
 	for (int id_laser : vPlayerProjectiles) {
 		GameObject& obj_laser = Play::GetGameObject(id_laser);
 		bool hasCollided = false;
 		
-		if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Type_Enemy))) {
+		if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Normal))) {
+			hasCollided = true;
+		}
+		else if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Speed))) {
+			hasCollided = true;
+		}
+		else if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Heavy))) {
 			hasCollided = true;
 		}
 
