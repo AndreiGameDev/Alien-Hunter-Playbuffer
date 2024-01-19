@@ -7,7 +7,7 @@ enum GameObjectTypes {
 	TYPE_Player,
 	Type_PlayerProjectile,
 	Type_Destroyed,
-	Enemy_Speed,
+	Enemy_Light,
 	Enemy_Heavy,
 	Enemy_Normal,
 };
@@ -22,22 +22,35 @@ PlayState currentPlayState;
 
 struct EnemyManager {
 	float spawnTimer = 0;
-	float spawnRate = .4f;
+	float spawnRate = .5f;
+	float newWaveTimer = 0;
+	float newWaveCountdown = 10;
+	bool triggerNewWaveCountdown = false;
 	int enemiesSpawned = 0;
-	int enemiesToSpawn = 10;
+	int enemiesToSpawn = 100;
+	float lightEnemySpeed = 5;
+	float normalEnemySpeed = 3;
+	float heavyEnemySpeed = 1;
 };
 EnemyManager enemyManager;
 
+struct PlayerProperties {
+	float playerSpeed = 1;
+	float projectileSpeed = 2;
+	float animatorSpeed = 0.1f;
+	
+	float projectileFireRate = .5f;
+	float projectileTimer = 0;
+	bool canShoot = true;
+};
+
+PlayerProperties playerProperties;
 int _displayWidth = 240;
 int _displayHeight = 240;
 int _displayScale = 3;
 int _clampScreen = 15;
 int score = 0;
-float playerSpeed = 1;
-float projectileSpeed = 2;
-float animatorSpeed = 0.1f;
 
-float enemySpeed = 2;
 
 // The entry point for a PlayBuffer program
 void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
@@ -54,35 +67,38 @@ void UpdateScore() {
 
 void UpdatePlayer() {
 	GameObject& player = Play::GetGameObjectByType(TYPE_Player);
-	bool canShoot = true;
+	if (playerProperties.canShoot == false && playerProperties.projectileTimer > playerProperties.projectileFireRate) {
+		playerProperties.canShoot = true;
+		playerProperties.projectileTimer = 0;
+	}
 	player.pos += player.velocity;
 	if (Play::IsLeavingDisplayArea(player, Play::HORIZONTAL)) {
 		player.pos.x = player.oldPos.x;
 	}
 
 	if (Play::KeyDown(0x44)) { // Right
-		Play::SetSprite(player, "Player_Spaceship_Moving", animatorSpeed);
-		player.velocity.x = playerSpeed;
+		Play::SetSprite(player, "Player_Spaceship_Moving", playerProperties.animatorSpeed);
+		player.velocity.x = playerProperties.playerSpeed;
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "Right");
 	}
 	else if (Play::KeyDown(0x41)) { // Left
-		Play::SetSprite(player, "Player_Spaceship_Moving", animatorSpeed);
-		player.velocity.x = -playerSpeed;
+		Play::SetSprite(player, "Player_Spaceship_Moving", playerProperties.animatorSpeed);
+		player.velocity.x = -playerProperties.playerSpeed;
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "Left");
 	}
 	else { // No input
-		Play::SetSprite(player, "Player_Spaceship_Idle", animatorSpeed);
+		Play::SetSprite(player, "Player_Spaceship_Idle", playerProperties.animatorSpeed);
 		player.velocity.x = 0;
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "Idle");
 	}
-	if (Play::KeyPressed(0x01) && canShoot) { // Mouse 1
+	if (Play::KeyPressed(0x01) && playerProperties.canShoot) { // Mouse 1
 		Vector2D RightPos = Vector2D(player.pos.x + 6, player.pos.y - 6);
 		Vector2D LeftPos = Vector2D(player.pos.x - 6, player.pos.y - 6);
 		int idLeftProjectile = Play::CreateGameObject(Type_PlayerProjectile, RightPos, 2, "PlayerLaser");
 		int idRightProjectile = Play::CreateGameObject(Type_PlayerProjectile, LeftPos, 2, "PlayerLaser");
-		Play::GetGameObject(idLeftProjectile).velocity.y = -projectileSpeed;
-		Play::GetGameObject(idRightProjectile).velocity.y = -projectileSpeed;
-		canShoot = false;
+		Play::GetGameObject(idLeftProjectile).velocity.y = -playerProperties.projectileSpeed;
+		Play::GetGameObject(idRightProjectile).velocity.y = -playerProperties.projectileSpeed;
+		playerProperties.canShoot = false;
 	}
 	// Update position of the player
 	Play::UpdateGameObject(player);
@@ -101,25 +117,38 @@ void EnemySpawner() {
 		enemyManager.enemiesSpawned++;
 		int randomEnemy = Play::RandomRollRange(1, 10);
 		if (randomEnemy < 6) {
-			int idEnemy = Play::CreateGameObject(Enemy_Normal, rightSpawnPos, 16, "Enemy1");
-			Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
+			int idEnemy = Play::CreateGameObject(Enemy_Normal, rightSpawnPos, 16, "EnemyNormal");
+			Play::GetGameObject(idEnemy).velocity.x = -enemyManager.normalEnemySpeed;
 		}
 		else if (randomEnemy > 6 && randomEnemy < 8) {
-			int idEnemy = Play::CreateGameObject(Enemy_Speed, rightSpawnPos, 16, "Enemy2");
-			Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
+			int idEnemy = Play::CreateGameObject(Enemy_Light, rightSpawnPos, 16, "EnemyLight");
+			Play::GetGameObject(idEnemy).velocity.x = -enemyManager.lightEnemySpeed;
 		}
 		else {
-			int idEnemy = Play::CreateGameObject(Enemy_Heavy, rightSpawnPos, 16, "Enemy3");
-			Play::GetGameObject(idEnemy).velocity.x = -enemySpeed;
+			int idEnemy = Play::CreateGameObject(Enemy_Heavy, rightSpawnPos, 16, "EnemyHeavy");
+			Play::GetGameObject(idEnemy).velocity.x = -enemyManager.heavyEnemySpeed;
 		}
-		
+	}
+	else {
+		enemyManager.triggerNewWaveCountdown = true;
 	}
 	
 }
 
+void NewWaveEvent(float elapsedTime) {
+	
+	if (enemyManager.newWaveTimer > enemyManager.newWaveCountdown) {
+		enemyManager.triggerNewWaveCountdown = false;
+		enemyManager.spawnRate = enemyManager.spawnRate / 2;
+	}
+	else {
+		enemyManager.newWaveTimer += elapsedTime;
+	}
+}
+
 void UpdateEnemies() {
 	std::vector<int> vEnemiesNormal = Play::CollectGameObjectIDsByType(Enemy_Normal);
-	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Speed);
+	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Light);
 	std::vector<int> vEnemiesHeavy = Play::CollectGameObjectIDsByType(Enemy_Heavy);
 
 	std::vector<int> vEnemies;
@@ -135,11 +164,11 @@ void UpdateEnemies() {
 		if (Play::IsLeavingDisplayArea(obj_enemy, Play::HORIZONTAL)) {
 			obj_enemy.pos.x = obj_enemy.pos.x;
 			obj_enemy.pos.y += 20;
-			if (obj_enemy.velocity.x == enemySpeed) {
-				obj_enemy.velocity.x = -enemySpeed;
+			if (obj_enemy.velocity.x > 0) {
+				obj_enemy.velocity.x = -obj_enemy.velocity.x;
 			}
 			else {
-				obj_enemy.velocity.x = enemySpeed;
+				obj_enemy.velocity.x = abs(obj_enemy.velocity.x);
 			}
 		}
 		Play::UpdateGameObject(obj_enemy);
@@ -151,7 +180,7 @@ void UpdateProjectiles()
 {
 	std::vector<int> vPlayerProjectiles = Play::CollectGameObjectIDsByType(Type_PlayerProjectile);
 	std::vector<int> vEnemiesNormal = Play::CollectGameObjectIDsByType(Enemy_Normal);
-	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Speed);
+	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Light);
 	std::vector<int> vEnemiesHeavy = Play::CollectGameObjectIDsByType(Enemy_Heavy);
 
 	std::vector<int> vEnemies;
@@ -170,7 +199,7 @@ void UpdateProjectiles()
 		if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Normal))) {
 			hasCollided = true;
 		}
-		else if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Speed))) {
+		else if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Light))) {
 			hasCollided = true;
 		}
 		else if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Heavy))) {
@@ -218,13 +247,13 @@ void MainMenu() {
 
 bool MainGameUpdate(float elapsedTime)
 {
-	Play::ClearDrawingBuffer(Play::cMagenta);
+	Play::ClearDrawingBuffer(Play::cBlack);
 	switch (currentPlayState) {
 	case State_MainMenu:
 		MainMenu();
 		break;
 	case State_Play:
-		enemyManager.spawnTimer += elapsedTime;
+		TimerRelatedFunctions(elapsedTime);
 		PlayFunctions();
 		break;
 	case State_Pause:
@@ -247,7 +276,13 @@ void PlayFunctions()
 	UpdateProjectiles();
 	UpdateEnemies();
 }
-
+void TimerRelatedFunctions(float deltaTime) {
+	enemyManager.spawnTimer += deltaTime;
+	playerProperties.projectileTimer += deltaTime;
+	if (enemyManager.triggerNewWaveCountdown) {
+		NewWaveEvent(deltaTime);
+	}
+}
 // Gets called once when the player quits the game 
 int MainGameExit(void)
 {
