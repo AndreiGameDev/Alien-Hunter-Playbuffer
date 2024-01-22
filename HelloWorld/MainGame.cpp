@@ -15,7 +15,7 @@ enum GameObjectTypes {
 enum PlayState {
 	State_MainMenu,
 	State_Play,
-	State_Pause
+	State_GameOver
 };
 
 PlayState currentPlayState;
@@ -27,7 +27,8 @@ struct EnemyManager {
 	float newWaveCountdown = 10;
 	bool triggerNewWaveCountdown = false;
 	int enemiesSpawned = 0;
-	int enemiesToSpawn = 100;
+	int enemiesToSpawnOnReset = 1;
+	int enemiesToSpawn = 0;
 	float lightEnemySpeed = 5;
 	float normalEnemySpeed = 3;
 	float heavyEnemySpeed = 1;
@@ -35,11 +36,13 @@ struct EnemyManager {
 EnemyManager enemyManager;
 
 struct PlayerProperties {
+	int playerLivesOnReset = 2;
+	int playerLives = 0;
 	float playerSpeed = 1;
 	float projectileSpeed = 2;
 	float animatorSpeed = 0.1f;
 	
-	float projectileFireRate = .5f;
+	float projectileFireRate = .75f;
 	float projectileTimer = 0;
 	bool canShoot = true;
 };
@@ -58,13 +61,17 @@ void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
 	Play::CreateManager(_displayWidth, _displayHeight, _displayScale);
 	Play::CreateGameObject(TYPE_Player, { _displayWidth / 2, _displayHeight - 10 }, 16, "Player_Spaceship_Idle"); // Player sprite
 	Play::CentreAllSpriteOrigins();
+	enemyManager.enemiesToSpawn = enemyManager.enemiesToSpawnOnReset;
+	playerProperties.playerLives = playerProperties.playerLivesOnReset;
 }
 
 
 void UpdateScore() {
 	Play::DrawDebugText({ 5, 14 }, std::string("Score:" + std::to_string(score)).c_str(), Play::cWhite, false);
 }
-
+void UpdatePlayerHP() {
+	Play::DrawDebugText({ _displayWidth - 50,14 }, std::string("Lives:" + std::to_string(playerProperties.playerLives)).c_str(), Play::cWhite, false);
+}
 void UpdatePlayer() {
 	GameObject& player = Play::GetGameObjectByType(TYPE_Player);
 	if (playerProperties.canShoot == false && playerProperties.projectileTimer > playerProperties.projectileFireRate) {
@@ -74,6 +81,15 @@ void UpdatePlayer() {
 	player.pos += player.velocity;
 	if (Play::IsLeavingDisplayArea(player, Play::HORIZONTAL)) {
 		player.pos.x = player.oldPos.x;
+	}
+	if (Play::KeyPressed(0x01) && playerProperties.canShoot) { // Mouse 1
+		Vector2D RightPos = Vector2D(player.pos.x + 6, player.pos.y - 6);
+		Vector2D LeftPos = Vector2D(player.pos.x - 6, player.pos.y - 6);
+		int idLeftProjectile = Play::CreateGameObject(Type_PlayerProjectile, RightPos, 2, "PlayerLaser");
+		int idRightProjectile = Play::CreateGameObject(Type_PlayerProjectile, LeftPos, 2, "PlayerLaser");
+		Play::GetGameObject(idLeftProjectile).velocity.y = -playerProperties.projectileSpeed;
+		Play::GetGameObject(idRightProjectile).velocity.y = -playerProperties.projectileSpeed;
+		playerProperties.canShoot = false;
 	}
 
 	if (Play::KeyDown(0x44)) { // Right
@@ -91,15 +107,7 @@ void UpdatePlayer() {
 		player.velocity.x = 0;
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "Idle");
 	}
-	if (Play::KeyPressed(0x01) && playerProperties.canShoot) { // Mouse 1
-		Vector2D RightPos = Vector2D(player.pos.x + 6, player.pos.y - 6);
-		Vector2D LeftPos = Vector2D(player.pos.x - 6, player.pos.y - 6);
-		int idLeftProjectile = Play::CreateGameObject(Type_PlayerProjectile, RightPos, 2, "PlayerLaser");
-		int idRightProjectile = Play::CreateGameObject(Type_PlayerProjectile, LeftPos, 2, "PlayerLaser");
-		Play::GetGameObject(idLeftProjectile).velocity.y = -playerProperties.projectileSpeed;
-		Play::GetGameObject(idRightProjectile).velocity.y = -playerProperties.projectileSpeed;
-		playerProperties.canShoot = false;
-	}
+	
 	// Update position of the player
 	Play::UpdateGameObject(player);
 
@@ -129,7 +137,7 @@ void EnemySpawner() {
 			Play::GetGameObject(idEnemy).velocity.x = -enemyManager.heavyEnemySpeed;
 		}
 	}
-	else {
+	else if(enemyManager.enemiesToSpawn == 0){
 		enemyManager.triggerNewWaveCountdown = true;
 	}
 	
@@ -137,11 +145,12 @@ void EnemySpawner() {
 
 void NewWaveEvent(float elapsedTime) {
 	
-	if (enemyManager.newWaveTimer > enemyManager.newWaveCountdown) {
+	if (enemyManager.newWaveTimer > enemyManager.newWaveCountdown && enemyManager.triggerNewWaveCountdown == true) {
 		enemyManager.triggerNewWaveCountdown = false;
-		enemyManager.spawnRate = enemyManager.spawnRate / 2;
+		enemyManager.enemiesToSpawn = enemyManager.enemiesToSpawnOnReset;
+		enemyManager.spawnRate = enemyManager.spawnRate * 1.1f;
 	}
-	else {
+	else if(enemyManager.triggerNewWaveCountdown == true) {
 		enemyManager.newWaveTimer += elapsedTime;
 	}
 }
@@ -169,6 +178,20 @@ void UpdateEnemies() {
 			}
 			else {
 				obj_enemy.velocity.x = abs(obj_enemy.velocity.x);
+			}
+		}
+
+		if (obj_enemy.pos.y >= 200.0f) {
+			if (obj_enemy.type != Type_Destroyed) {
+				obj_enemy.type = Type_Destroyed;
+				//Play audio
+				playerProperties.playerLives--;
+				if (playerProperties.playerLives == 0) {
+					currentPlayState = State_GameOver;
+					Play::DestroyGameObjectsByType(Enemy_Normal);
+					Play::DestroyGameObjectsByType(Enemy_Light);
+					Play::DestroyGameObjectsByType(Enemy_Heavy);
+				}
 			}
 		}
 		Play::UpdateGameObject(obj_enemy);
@@ -227,6 +250,7 @@ void UpdateProjectiles()
 		}
 	}
 }
+
 void UpdateDestroyed()
 {
 	std::vector<int> vDead = Play::CollectGameObjectIDsByType(Type_Destroyed);
@@ -253,10 +277,26 @@ bool MainGameUpdate(float elapsedTime)
 		MainMenu();
 		break;
 	case State_Play:
-		TimerRelatedFunctions(elapsedTime);
+		Play::DrawLine({ 0, _displayHeight - 40 }, { _displayWidth, _displayHeight - 40 }, Play::cWhite);
+		enemyManager.spawnTimer += elapsedTime;
+		playerProperties.projectileTimer += elapsedTime;
+		if (enemyManager.triggerNewWaveCountdown) {
+			NewWaveEvent(elapsedTime);
+		}
 		PlayFunctions();
 		break;
-	case State_Pause:
+	case State_GameOver:
+		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 - 25 }, "You have died.");
+		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, std::string("Score achieved: " + std::to_string(score)).c_str());
+		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2+25 }, "Press Space to retry");
+		if (Play::KeyPressed(VK_SPACE)) {
+			currentPlayState = State_Play;
+			score = 0;
+			enemyManager.enemiesSpawned = 0;
+			enemyManager.enemiesToSpawn = enemyManager.enemiesToSpawnOnReset;
+			enemyManager.triggerNewWaveCountdown = false;
+			playerProperties.playerLives = playerProperties.playerLivesOnReset;
+		}
 		break;
 	default:
 		currentPlayState = State_MainMenu;
@@ -271,17 +311,11 @@ void PlayFunctions()
 {
 	EnemySpawner();
 	UpdateDestroyed();
+	UpdatePlayerHP();
 	UpdateScore();
 	UpdatePlayer();
 	UpdateProjectiles();
 	UpdateEnemies();
-}
-void TimerRelatedFunctions(float deltaTime) {
-	enemyManager.spawnTimer += deltaTime;
-	playerProperties.projectileTimer += deltaTime;
-	if (enemyManager.triggerNewWaveCountdown) {
-		NewWaveEvent(deltaTime);
-	}
 }
 // Gets called once when the player quits the game 
 int MainGameExit(void)
