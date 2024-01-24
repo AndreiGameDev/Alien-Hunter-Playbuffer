@@ -27,7 +27,7 @@ struct EnemyManager {
 	float newWaveCountdown = 10;
 	bool triggerNewWaveCountdown = false;
 	int enemiesSpawned = 0;
-	int enemiesToSpawnOnReset = 1;
+	int enemiesToSpawnOnReset = 100;
 	int enemiesToSpawn = 0;
 	float lightEnemySpeed = 5;
 	float normalEnemySpeed = 3;
@@ -108,7 +108,6 @@ void UpdatePlayer() {
 	// Update position of the player
 	Play::UpdateGameObject(player);
 
-	Play::DrawCircle({ _displayWidth / 2, 40 }, 3, Play::cWhite); // Simulating where the point of spawn would be 
 	// Draw the update position of the player;
 	Play::DrawObject(player);
 }
