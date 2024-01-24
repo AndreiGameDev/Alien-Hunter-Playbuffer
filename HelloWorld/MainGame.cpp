@@ -39,7 +39,7 @@ struct PlayerProperties {
 	int playerLivesOnReset = 2;
 	int playerLives = 0;
 	float playerSpeed = 1;
-	float projectileSpeed = 2;
+	float projectileSpeed = 5;
 	float animatorSpeed = 0.1f;
 
 	float projectileFireRate = .75f;
@@ -66,13 +66,13 @@ void MainGameEntry(PLAY_IGNORE_COMMAND_LINE)
 }
 
 
-void UpdateScore() {
+void UpdateScore() { // Updates the text for the score
 	Play::DrawDebugText({ 5, 14 }, std::string("Score:" + std::to_string(score)).c_str(), Play::cWhite, false);
 }
-void UpdatePlayerHP() {
+void UpdatePlayerHP() { // Updates the text for the Player Lives
 	Play::DrawDebugText({ _displayWidth - 50,14 }, std::string("Lives:" + std::to_string(playerProperties.playerLives)).c_str(), Play::cWhite, false);
 }
-void UpdatePlayer() {
+void UpdatePlayer() { // Player Controller
 	GameObject& player = Play::GetGameObjectByType(TYPE_Player);
 	if (playerProperties.canShoot == false && playerProperties.projectileTimer > playerProperties.projectileFireRate) {
 		playerProperties.canShoot = true;
@@ -90,6 +90,7 @@ void UpdatePlayer() {
 		Play::GetGameObject(idLeftProjectile).velocity.y = -playerProperties.projectileSpeed;
 		Play::GetGameObject(idRightProjectile).velocity.y = -playerProperties.projectileSpeed;
 		playerProperties.canShoot = false;
+		Play::PlayAudio("SFX_Shoot");
 	}
 
 	if (Play::KeyDown(0x44)) { // Right
@@ -105,16 +106,12 @@ void UpdatePlayer() {
 		player.velocity.x = 0;
 	}
 
-	// Update position of the player
 	Play::UpdateGameObject(player);
-
-	// Draw the update position of the player;
 	Play::DrawObject(player);
 }
 
-void EnemySpawner() {
+void EnemySpawner() { // Spawns Enemies
 	Vector2D rightSpawnPos = { _displayWidth, 40 };
-
 	if (enemyManager.spawnTimer > enemyManager.spawnRate && enemyManager.enemiesToSpawn > 0) {
 		enemyManager.spawnTimer = 0;
 		enemyManager.enemiesToSpawn--;
@@ -136,11 +133,9 @@ void EnemySpawner() {
 	else if (enemyManager.enemiesToSpawn == 0) {
 		enemyManager.triggerNewWaveCountdown = true;
 	}
-
 }
 
-void NewWaveEvent(float elapsedTime) {
-
+void NewWaveEvent(float elapsedTime) { // Ramps up difficulty and makes enemies spawn again when a wave dies
 	if (enemyManager.newWaveTimer > enemyManager.newWaveCountdown && enemyManager.triggerNewWaveCountdown == true) {
 		enemyManager.triggerNewWaveCountdown = false;
 		enemyManager.enemiesToSpawn = enemyManager.enemiesToSpawnOnReset;
@@ -151,7 +146,7 @@ void NewWaveEvent(float elapsedTime) {
 	}
 }
 
-void UpdateEnemies() {
+void UpdateEnemies() { // Enemy Controllers
 	std::vector<int> vEnemiesNormal = Play::CollectGameObjectIDsByType(Enemy_Normal);
 	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Light);
 	std::vector<int> vEnemiesHeavy = Play::CollectGameObjectIDsByType(Enemy_Heavy);
@@ -180,7 +175,7 @@ void UpdateEnemies() {
 		if (obj_enemy.pos.y >= 200.0f) {
 			if (obj_enemy.type != Type_Destroyed) {
 				obj_enemy.type = Type_Destroyed;
-				//Play audio
+				Play::PlayAudio("SFX_Hurt");
 				playerProperties.playerLives--;
 				if (playerProperties.playerLives == 0) {
 					currentPlayState = State_GameOver;
@@ -195,8 +190,7 @@ void UpdateEnemies() {
 	}
 }
 
-void UpdateProjectiles()
-{
+void UpdateProjectiles() { // Projectile Logic
 	std::vector<int> vPlayerProjectiles = Play::CollectGameObjectIDsByType(Type_PlayerProjectile);
 	std::vector<int> vEnemiesNormal = Play::CollectGameObjectIDsByType(Enemy_Normal);
 	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Light);
@@ -231,7 +225,7 @@ void UpdateProjectiles()
 				if (obj_enemy.type != Type_Destroyed) {
 					hasCollided = true;
 					obj_enemy.type = Type_Destroyed;
-					//Play audio
+					Play::PlayAudio("SFX_EnemyDeath");
 					score += 200;
 				}
 			}
@@ -247,7 +241,7 @@ void UpdateProjectiles()
 	}
 }
 
-void UpdateDestroyed()
+void UpdateDestroyed() // Destroys objects
 {
 	std::vector<int> vDead = Play::CollectGameObjectIDsByType(Type_Destroyed);
 	for (int id_dead : vDead)
@@ -258,17 +252,44 @@ void UpdateDestroyed()
 	}
 }
 
-void MainMenu() {
+void MainMenu() { // Main Menu State
 	Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "PRESS ENTER TO PLAY");
 	if (Play::KeyPressed(VK_RETURN)) {
 		currentPlayState = State_Play;
 	}
 }
 
-bool MainGameUpdate(float elapsedTime)
+void ResetGame() { // Resets game to how it was initially 
+	currentPlayState = State_Play;
+	score = 0;
+	enemyManager.enemiesSpawned = 0;
+	enemyManager.enemiesToSpawn = enemyManager.enemiesToSpawnOnReset;
+	enemyManager.triggerNewWaveCountdown = false;
+	playerProperties.playerLives = playerProperties.playerLivesOnReset;
+	std::vector<int> vPlayerProjectiles = Play::CollectGameObjectIDsByType(Type_PlayerProjectile);
+	std::vector<int> vEnemiesNormal = Play::CollectGameObjectIDsByType(Enemy_Normal);
+	std::vector<int> vEnemiesSpeed = Play::CollectGameObjectIDsByType(Enemy_Light);
+	std::vector<int> vEnemiesHeavy = Play::CollectGameObjectIDsByType(Enemy_Heavy);
+	std::vector<int> vEnemies;
+	vEnemies.reserve(vEnemiesNormal.size() + vEnemiesSpeed.size() + vEnemiesHeavy.size());
+	std::copy(vEnemiesNormal.begin(), vEnemiesNormal.end(), std::back_inserter(vEnemies));
+	std::copy(vEnemiesSpeed.begin(), vEnemiesSpeed.end(), std::back_inserter(vEnemies));
+	std::copy(vEnemiesHeavy.begin(), vEnemiesHeavy.end(), std::back_inserter(vEnemies));
+	for(int enemy : vEnemies) {
+		GameObject& obj_enemy = Play::GetGameObject(enemy);
+		obj_enemy.type = Type_Destroyed;
+	}
+	for (int projectile : vPlayerProjectiles) {
+		Play::DestroyGameObject(projectile);
+	}
+	UpdateDestroyed();
+
+}
+
+bool MainGameUpdate(float elapsedTime) 
 {
 	Play::ClearDrawingBuffer(Play::cBlack);
-	switch (currentPlayState) {
+	switch (currentPlayState) { // Play State Controller
 	case State_MainMenu:
 		MainMenu();
 		break;
@@ -286,12 +307,7 @@ bool MainGameUpdate(float elapsedTime)
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, std::string("Score achieved: " + std::to_string(score)).c_str());
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 + 25 }, "Press Space to retry");
 		if (Play::KeyPressed(VK_SPACE)) {
-			currentPlayState = State_Play;
-			score = 0;
-			enemyManager.enemiesSpawned = 0;
-			enemyManager.enemiesToSpawn = enemyManager.enemiesToSpawnOnReset;
-			enemyManager.triggerNewWaveCountdown = false;
-			playerProperties.playerLives = playerProperties.playerLivesOnReset;
+			ResetGame();
 		}
 		break;
 	default:
@@ -303,7 +319,7 @@ bool MainGameUpdate(float elapsedTime)
 	return Play::KeyDown(VK_ESCAPE);
 }
 
-void PlayFunctions()
+void PlayFunctions() // Most of the updates done in the game
 {
 	EnemySpawner();
 	UpdateDestroyed();
@@ -313,8 +329,8 @@ void PlayFunctions()
 	UpdateProjectiles();
 	UpdateEnemies();
 }
-// Gets called once when the player quits the game 
-int MainGameExit(void)
+
+int MainGameExit(void) // Exits game
 {
 	Play::DestroyManager();
 	return PLAY_OK;
