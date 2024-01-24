@@ -218,7 +218,6 @@ void UpdateProjectiles() { // Projectile Logic
 		else if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Heavy))) {
 			hasCollided = true;
 		}
-
 		for (int id_enemy : vEnemies) {
 			GameObject& obj_enemy = Play::GetGameObject(id_enemy);
 			if (Play::IsColliding(obj_laser, obj_enemy)) {
@@ -230,19 +229,15 @@ void UpdateProjectiles() { // Projectile Logic
 				}
 			}
 		}
-
 		Play::UpdateGameObject(obj_laser);
 		Play::DrawObject(obj_laser);
-
-
 		if (!Play::IsVisible || hasCollided) {
 			Play::DestroyGameObject(id_laser);
 		}
 	}
 }
 
-void UpdateDestroyed() // Destroys objects
-{
+void UpdateDestroyed() { // Destroys objects
 	std::vector<int> vDead = Play::CollectGameObjectIDsByType(Type_Destroyed);
 	for (int id_dead : vDead)
 	{
