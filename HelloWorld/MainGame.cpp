@@ -41,7 +41,7 @@ struct PlayerProperties {
 	float playerSpeed = 1;
 	float projectileSpeed = 2;
 	float animatorSpeed = 0.1f;
-	
+
 	float projectileFireRate = .75f;
 	float projectileTimer = 0;
 	bool canShoot = true;
@@ -95,19 +95,16 @@ void UpdatePlayer() {
 	if (Play::KeyDown(0x44)) { // Right
 		Play::SetSprite(player, "Player_Spaceship_Moving", playerProperties.animatorSpeed);
 		player.velocity.x = playerProperties.playerSpeed;
-		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "Right");
 	}
 	else if (Play::KeyDown(0x41)) { // Left
 		Play::SetSprite(player, "Player_Spaceship_Moving", playerProperties.animatorSpeed);
 		player.velocity.x = -playerProperties.playerSpeed;
-		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "Left");
 	}
 	else { // No input
 		Play::SetSprite(player, "Player_Spaceship_Idle", playerProperties.animatorSpeed);
 		player.velocity.x = 0;
-		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, "Idle");
 	}
-	
+
 	// Update position of the player
 	Play::UpdateGameObject(player);
 
@@ -118,7 +115,7 @@ void UpdatePlayer() {
 
 void EnemySpawner() {
 	Vector2D rightSpawnPos = { _displayWidth, 40 };
-	
+
 	if (enemyManager.spawnTimer > enemyManager.spawnRate && enemyManager.enemiesToSpawn > 0) {
 		enemyManager.spawnTimer = 0;
 		enemyManager.enemiesToSpawn--;
@@ -137,20 +134,20 @@ void EnemySpawner() {
 			Play::GetGameObject(idEnemy).velocity.x = -enemyManager.heavyEnemySpeed;
 		}
 	}
-	else if(enemyManager.enemiesToSpawn == 0){
+	else if (enemyManager.enemiesToSpawn == 0) {
 		enemyManager.triggerNewWaveCountdown = true;
 	}
-	
+
 }
 
 void NewWaveEvent(float elapsedTime) {
-	
+
 	if (enemyManager.newWaveTimer > enemyManager.newWaveCountdown && enemyManager.triggerNewWaveCountdown == true) {
 		enemyManager.triggerNewWaveCountdown = false;
 		enemyManager.enemiesToSpawn = enemyManager.enemiesToSpawnOnReset;
 		enemyManager.spawnRate = enemyManager.spawnRate * 1.1f;
 	}
-	else if(enemyManager.triggerNewWaveCountdown == true) {
+	else if (enemyManager.triggerNewWaveCountdown == true) {
 		enemyManager.newWaveTimer += elapsedTime;
 	}
 }
@@ -218,7 +215,7 @@ void UpdateProjectiles()
 	for (int id_laser : vPlayerProjectiles) {
 		GameObject& obj_laser = Play::GetGameObject(id_laser);
 		bool hasCollided = false;
-		
+
 		if (Play::IsColliding(obj_laser, Play::GetGameObjectByType(Enemy_Normal))) {
 			hasCollided = true;
 		}
@@ -243,7 +240,7 @@ void UpdateProjectiles()
 
 		Play::UpdateGameObject(obj_laser);
 		Play::DrawObject(obj_laser);
-		
+
 
 		if (!Play::IsVisible || hasCollided) {
 			Play::DestroyGameObject(id_laser);
@@ -288,7 +285,7 @@ bool MainGameUpdate(float elapsedTime)
 	case State_GameOver:
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 - 25 }, "You have died.");
 		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 }, std::string("Score achieved: " + std::to_string(score)).c_str());
-		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2+25 }, "Press Space to retry");
+		Play::DrawDebugText({ _displayWidth / 2, _displayHeight / 2 + 25 }, "Press Space to retry");
 		if (Play::KeyPressed(VK_SPACE)) {
 			currentPlayState = State_Play;
 			score = 0;
